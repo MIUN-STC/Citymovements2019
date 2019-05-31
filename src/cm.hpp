@@ -75,13 +75,14 @@ void cm_track
 (
 	//Input target keypoints
 	//Discontinuous target coordinate of interest that we want to track.
+	//Can be used to calculate tracker to target velocity.
 	std::vector<cv::KeyPoint>& kp,
 	//Tracker position
 	//Can be used to check if the target is close to border.
-	//Can be used to calculate velocity.
+	//Can be used to calculate tracker to target velocity.
 	cv::Point2f p [],
 	//Tracker velocity
-	//Can be used to calculate the angle.
+	//Can be used to calculate which direction that the tracking is going.
 	cv::Point2f v [],
 	//Tracker persistence
 	// 0          : Tracker has no target and is not tracking.
@@ -102,11 +103,16 @@ void cm_track
 	cm_update (v, pe, n, persistence);
 	for (size_t i = 0; i < kp.size (); i++)
 	{
+		//Find a (target,tracker) pair
 		int j = cm_find (p, pe, n, kp [i], proximity);
 		if (j == -1) {continue;};
+		//Calculate delta vector between target and tracker and use it as smoothed velocity
 		v [j] = 0.9f * v [j] + (kp [i].pt - p [i]) * 0.1f;
+		//Move tracker to target
 		p [j] = kp [i].pt;
+		//Set the tracker persistence high i.e. tracking is active.
 		pe [j] = persistence;
+		//Increase the trackers tracking duration.
 		t [j] ++;
 	}
 }
@@ -135,13 +141,15 @@ bool cm_countman
 	bool way_update = false;
 	while (n--)
 	{
-		//Check if the target has been gone for a while.
-		//This is making sure that the target is not deciding to go
-		//back when it is outside the view of camera.
-		//Check if the target has been tracked for a while. 
+		//Make sure that the target is realy gone.
 		if (pe [n] != 1) {continue;}
+		
+		//Make sure that the target has not been tracking noise.
 		if (t [n] < 30){continue;}
+		
+		//Reset target
 		t [n] = 0;
+		
 		//Flag variable for if the target has beed counted or not.
 		bool border = false;
 		//Angle of the targets direction in degrees.
@@ -182,6 +190,8 @@ bool cm_countman
 		
 		if (border)
 		{
+			//Trackers with negative one tracking time duration
+			//is trackers that thinks that the target left the premise.
 			t [n] = -1;
 			way_update = true;
 		}
