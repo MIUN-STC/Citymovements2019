@@ -34,8 +34,8 @@
 
 #define APP_WIN_X SDL_WINDOWPOS_UNDEFINED
 #define APP_WIN_Y SDL_WINDOWPOS_UNDEFINED
-#define APP_WIN_W 1920
-#define APP_WIN_H 1080
+#define APP_WIN_W LEP3_W
+#define APP_WIN_H LEP3_H
 #define APP_WIN_FLAGS SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN
 #define APP_WIN_NAME "Test background filter"
 #define APP_SHADERF "src/rgb.glfs"
@@ -214,6 +214,13 @@ int main(int argc, char *argv[])
 		
 		if (SDL_AtomicGet (&reader_atomic))
 		{
+			int x, y;
+			if (SDL_GetMouseState(&x, &y) & SDL_BUTTON (SDL_BUTTON_LEFT))
+			{
+				int w, h;
+				SDL_GetWindowSize(window,&w,&h);
+				cv::circle (m_source, cv::Point2i (x*LEP3_W/w, y*LEP3_H/h), 6.0f, cv::Scalar (255), -1);
+			}
 			Subtractor->apply (m_source, m_fg);
 			cv::GaussianBlur (m_fg, m_b, cv::Size (11, 11), 3.5, 3.5);
 			cv::cvtColor (m_b, m_render, cv::COLOR_GRAY2BGR);

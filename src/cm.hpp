@@ -2,14 +2,14 @@
 #include "lepton.h"
 
 
-//Size of the boxes for counting people.
+//Departure zone size
 size_t const CM_Size = 10;
-//Setup edge boxes dimension and coordinate for counting people.
+//Departure edge zones
 cv::Rect const CM_N (CM_Size, 0, LEP3_W - (CM_Size*2), CM_Size);
 cv::Rect const CM_S (CM_Size, LEP3_H - CM_Size, LEP3_W - (CM_Size*2), CM_Size);
 cv::Rect const CM_W (0, CM_Size, CM_Size, LEP3_H - (CM_Size*2));
 cv::Rect const CM_E (LEP3_W - CM_Size, CM_Size, CM_Size, LEP3_H - (CM_Size*2));
-//Setup corner boxes dimension and coordinate for counting people.
+//Departure corner zones
 cv::Rect const CM_NW (0, 0, CM_Size, CM_Size);
 cv::Rect const CM_NE (LEP3_W - CM_Size, 0, CM_Size, CM_Size);
 cv::Rect const CM_SW (0, LEP3_H - CM_Size, CM_Size, CM_Size);
@@ -18,17 +18,17 @@ cv::Rect const CM_SE (LEP3_W - CM_Size, LEP3_H - CM_Size, CM_Size, CM_Size);
 
 void cm_update 
 (
-	cv::Point2f v [], 
-	int pe [], 
-	uint32_t n, 
-	int persistence_max
+	cv::Point2f v [], //Tracker velocity
+	int pe [], //Tracker persistence
+	uint32_t n, //Number of trackers
+	int persistence
 )
 {
 	while (n--)
 	{
 		//If not tracking then decrease velocity
 		//Persistence should be max if it's tracking.
-		if (pe [n] < persistence_max)
+		if (pe [n] < persistence)
 		{
 			v [n] = v [n] * 0.95f;
 		}
@@ -45,10 +45,10 @@ void cm_update
 
 int cm_find 
 (
-	cv::Point2f p [],
-	int pe [], 
-	uint32_t n, 
-	cv::KeyPoint &kp, 
+	cv::Point2f p [], //Tracker position
+	int pe [], //Tracker persistence
+	uint32_t n, //Number of trackers
+	cv::KeyPoint &kp, //Target position
 	float proximity
 )
 {
@@ -118,27 +118,27 @@ void cm_track
 }
 
 
-//People count information for North, South, West, East.
+//Counter for people going north, south, west, east
 struct cm_4way
 {
-	size_t n;
-	size_t s;
-	size_t w;
-	size_t e;
+	uint32_t n;
+	uint32_t s;
+	uint32_t w;
+	uint32_t e;
 };
 
 
 bool cm_countman 
 (
-	cv::Point2f p [], 
-	cv::Point2f v [],
-	int pe [], 
-	int t [], 
-	uint32_t n, 
-	struct cm_4way &way
+	cv::Point2f p [], //Tracker position
+	cv::Point2f v [], //Tracker velocity
+	int pe [], //Tracker persistence
+	int t [], //Tracking duration
+	uint32_t n, //Number of trackers
+	struct cm_4way &way //Output people count
 )
 {
-	bool way_update = false;
+	bool departed_any = false;
 	while (n--)
 	{
 		//Make sure that the target is realy gone.
@@ -151,52 +151,53 @@ bool cm_countman
 		t [n] = 0;
 		
 		//Flag variable for if the target has beed counted or not.
-		bool border = false;
+		bool departed = false;
 		//Angle of the targets direction in degrees.
+		//TODO: Check if we can use dod product instead, 
+		//http://programmedlessons.org/VectorLessons/vch07/vch07_7.html
 		float a = atan2f (v [n].y, v [n].x);
 		float a360 = (180.0f / (float)M_PI) * a;
 		
-		//Check if the target is whithin the counting box.
-		//And angle of departure in the corner.
+		//Check of the tracker are inside the departure zones.
 		if (0) {}
-		else if (CM_N.contains (p [n])) {way.n ++; border = true;}
-		else if (CM_S.contains (p [n])) {way.s ++; border = true;}
-		else if (CM_W.contains (p [n])) {way.w ++; border = true;}
-		else if (CM_E.contains (p [n])) {way.e ++; border = true;}
+		else if (CM_N.contains (p [n])) {way.n ++; departed = true;}
+		else if (CM_S.contains (p [n])) {way.s ++; departed = true;}
+		else if (CM_W.contains (p [n])) {way.w ++; departed = true;}
+		else if (CM_E.contains (p [n])) {way.e ++; departed = true;}
 		else if (CM_NE.contains (p [n])) 
 		{
 			if (a360 < -45.0f) {way.s ++;}
 			else {way.e ++;}
-			border = true;
+			departed = true;
 		}
 		else if (CM_SE.contains (p [n])) 
 		{
 			if (a360 < 45.0f) {way.e ++;}
 			else {way.n ++;}
-			border = true;
+			departed = true;
 		}
 		else if (CM_NW.contains (p [n])) 
 		{
 			if (a360 < 255.0f) {way.w ++;}
 			else {way.n ++;}
-			border = true;
+			departed = true;
 		}
 		else if (CM_SW.contains (p [n])) 
 		{
 			if (a360 < 135.0f) {way.s ++;}
 			else {way.w ++;}
-			border = true;
+			departed = true;
 		}
 		
-		if (border)
+		if (departed)
 		{
 			//Trackers with negative one tracking time duration
 			//is trackers that thinks that the target left the premise.
 			t [n] = -1;
-			way_update = true;
+			departed_any = true;
 		}
 	}
-	return way_update;
+	return departed_any;
 }
 
 
