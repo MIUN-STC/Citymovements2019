@@ -164,15 +164,21 @@ int main(int argc, char *argv[])
 	struct
 	{
 		#define TRACKER_COUNT 4
-		cv::Point2f p [TRACKER_COUNT]; //Position
-		cv::Point2f v [TRACKER_COUNT]; //Delta
-		int pe [TRACKER_COUNT]; //Persistance
-		int t [TRACKER_COUNT]; //Time tracked
+		cv::Point2f p [TRACKER_COUNT]; //Trackers position
+		cv::Point2f v [TRACKER_COUNT]; //Trackers delta
+		int t [TRACKER_COUNT]; //Trackers tracked time
+		int u [TRACKER_COUNT]; //Trackers untracked time
+		float proximity;
+		int persistence;
+		int confidence;
 	} tracker;
 	struct cm_4way way;
 	memset (&way, 0, sizeof (way));
 	memset (&tracker, 0, sizeof (tracker));
-	
+	tracker.proximity = 10.0f;
+	tracker.persistence = 100;
+	tracker.confidence = 40;
+	ASSERT (tracker.confidence < tracker.persistence);
 	
 	while (1)
 	{
@@ -226,8 +232,8 @@ int main(int argc, char *argv[])
 			cv::cvtColor (m_b, m_render, cv::COLOR_GRAY2BGR);
 			Blobber->detect (m_b, Targets);
 			
-			cm_track (Targets, tracker.p, tracker.v, tracker.pe, tracker.t, TRACKER_COUNT);
-			bool counted = cm_countman (tracker.p, tracker.v, tracker.pe, tracker.t, TRACKER_COUNT, way);
+			cm_track (Targets, tracker.p, tracker.v, tracker.t, tracker.u, TRACKER_COUNT, tracker.proximity, tracker.persistence);
+			bool counted = cm_countman (tracker.p, tracker.v, tracker.u, tracker.t, TRACKER_COUNT, way, tracker.persistence, tracker.confidence);
 			if (counted) {cm_4way_print (way);}
 	
 			for (size_t i = 0; i < Targets.size (); i++)
@@ -239,10 +245,17 @@ int main(int argc, char *argv[])
 			{
 				char text [2];
 				snprintf (text, 2, "%d", i);
-				cv::putText (m_render, text, tracker.p [i] + cv::Point2f (-3.0f, 3.0f), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.4, cv::Scalar (0, 0, 255), 1);
-				if (tracker.pe [i] > 0)
+				cv::putText (m_render, text, tracker.p [i] + cv::Point2f (-3.0f, 3.0f), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.4, cv::Scalar (0, 0, 255), 1);	
+				if (tracker.u [i] < tracker.persistence)
 				{
-					cv::circle (m_render, tracker.p [i], 6.0f, cv::Scalar (255, 0, 0), 1);
+					if (tracker.t [i] < tracker.confidence)
+					{
+						cv::circle (m_render, tracker.p [i], 6.0f, cv::Scalar (255, 0, 0), 1);
+					}
+					else
+					{
+						cv::circle (m_render, tracker.p [i], 6.0f, cv::Scalar (255, 100, 50), 1);
+					}
 				}
 			}
 			
@@ -250,8 +263,11 @@ int main(int argc, char *argv[])
 			{
 				if (tracker.t [i] != -1) {continue;}
 				printf ("Tracker %i departured\n", i);
-				memset (&tracker, 0, sizeof (tracker));
+				//Reset target
+				tracker.v [i] = {0.0f, 0.0f};
 				tracker.p [i] = {(float)LEP3_W / 2.0f, (float)LEP3_H / 2.0f};
+				tracker.t [i] = 0;
+				tracker.u [i] = 0;
 			}
 			
 			cv::rectangle (m_render, CM_N, cv::Scalar (255, 0, 255));
