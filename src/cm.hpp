@@ -131,14 +131,14 @@ bool cm_countman
 		else if (CM_E.contains (p [n])) {way.e ++; departed = true;}
 		else if (CM_NE.contains (p [n])) 
 		{
-			if (a360 < -45.0f) {way.s ++;}
+			if (a360 < -45.0f) {way.n ++;}
 			else {way.e ++;}
 			departed = true;
 		}
 		else if (CM_SE.contains (p [n])) 
 		{
 			if (a360 < 45.0f) {way.e ++;}
-			else {way.n ++;}
+			else {way.s ++;}
 			departed = true;
 		}
 		else if (CM_NW.contains (p [n])) 
