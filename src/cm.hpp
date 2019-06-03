@@ -16,64 +16,12 @@ cv::Rect const CM_SW (0, LEP3_H - CM_Size, CM_Size, CM_Size);
 cv::Rect const CM_SE (LEP3_W - CM_Size, LEP3_H - CM_Size, CM_Size, CM_Size);
 
 
-void cm_iv_adds (int r [], int v [], uint32_t n, int a)
-{
-	while (n--) 
-	{
-		r [n] = v [n] + a;
-	}
-}
-
-void cm_Point2fv_adds (cv::Point2f r [], cv::Point2f v [], uint32_t n, float a)
-{
-	while (n--) 
-	{
-		r [n] = v [n] * a;
-	}
-}
-
-
-int cm_pair 
-(
-	cv::Point2f p [], //Tracker position
-	int t [], //Tracker tracking time
-	int u [], //Tracker untracking time
-	uint32_t n, //Number of trackers
-	cv::KeyPoint &kp, //Target position
-	float proximity,
-	int persistence
-)
-{
-	int imin = -1;
-	float lmin = FLT_MAX;
-	while (n--)
-	{
-		float l = (float)cv::norm (p [n] - kp.pt);
-		//It is very important to update used trackers also.
-		//If the tracker is being used then only track the target in proximity.
-		if ((u [n] < persistence) && (l > proximity)) {continue;};
-		if (l < lmin)
-		{
-			lmin = l;
-			imin = (int)n;
-		}
-	}
-	if (imin >= 0 && lmin > proximity)
-	{
-		u [imin] = 0;
-		t [imin] = 0;
-	}
-	return imin;
-}
-
-
 //Producing continuous moving trackers.
 //Tracking time can be used to filter out trackers that tracks noise.
 //Tracker velocity can be used to calculate which direction that the tracking is going.
-//Tracker position can be used to calculate tracker to target velocity.
+//Tracker position and input target can be used to calculate tracker to target velocity.
 //Tracker position can be used to check if the target is close to border.
 //Input target keypoints is discontinuous target coordinate of interest that we want to track.
-//Input target keypoints can be used to calculate tracker to target velocity.
 //Proximity: How close the tracker can track a target.
 //Persistence: How long time a non tracking tracker should look for a target in proximity.
 void cm_track 
@@ -88,21 +36,50 @@ void cm_track
 	int persistence = 100
 )
 {
-	cm_Point2fv_adds (v, v, n, 0.95f);
-	cm_iv_adds (u, u, n, 1);
+	for (size_t i = 0; i < n; i++)
+	{
+		v [i] = v [i] * 0.95f;
+		//Reset tracker if the tracker has not seen a target for a while.
+		u [i] ++;
+		if (u [i] > persistence)
+		{
+			t [i] = 0;
+			v [i] = {0.0f, 0.0f};
+		}
+	}
+
 	for (size_t i = 0; i < kp.size (); i++)
 	{
 		//Find a (target,tracker) pair
-		int j = cm_pair (p, t, u, n, kp [i], proximity, persistence);
-		if (j == -1) {continue;};
-		//Calculate delta vector between target and tracker and use it as smoothed velocity
-		v [j] = 0.9f * v [j] + (kp [i].pt - p [i]) * 0.1f;
-		//Move tracker to target
-		p [j] = kp [i].pt;
-		//Increase the trackers tracking duration.
-		t [j] ++;
-		//Reset the untracking time
-		u [j] = 0;
+		//int j = cm_pair (p, t, u, n, kp [i], proximity, persistence);
+		int jmin = -1;
+		float lmin = FLT_MAX;
+		for (size_t j = 0; j < n; j++)
+		{
+			float l = (float)cv::norm (p [j] - kp [i].pt);
+			//It is very important to update used trackers also.
+			//If the tracker is being used then only track the target in proximity.
+			if ((u [j] < persistence) && (l > proximity)) {continue;};
+			if (l < lmin)
+			{
+				lmin = l;
+				jmin = (int)j;
+			}
+		}
+		if (jmin < 0) {continue;};
+		if (lmin > proximity)
+		{
+			t [jmin] = 0;
+			v [jmin] = {0.0f, 0.0f};
+		}
+		else
+		{
+			//Save smoothed delta vector between target and tracker.
+			v [jmin] = 0.9f * v [jmin] + (kp [i].pt - p [jmin]) * 0.1f;
+			t [jmin] ++;// Increment tracking duration.
+		}
+		p [jmin] = kp [i].pt;// Move tracker to target.
+		u [jmin] = 0;// Reset untracked duration.
 	}
 }
 
@@ -121,8 +98,8 @@ bool cm_countman
 (
 	cv::Point2f p [], //Tracker position
 	cv::Point2f v [], //Tracker velocity
-	int u [], //Tracker persistence
 	int t [], //Tracking duration
+	int u [], //Tracker persistence
 	uint32_t n, //Number of trackers
 	struct cm_4way &way, //Output people count,
 	int persistence,

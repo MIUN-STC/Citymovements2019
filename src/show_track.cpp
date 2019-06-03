@@ -164,21 +164,18 @@ int main(int argc, char *argv[])
 	struct
 	{
 		#define TRACKER_COUNT 4
+		#define TRACKER_PERSISTENCE 100
+		#define TRACKER_BORDER_PERSISTENCE 40
+		#define TRACKER_BORDER_CONFIDENCE 40
+		#define TRACKER_PROXIMITY 40.0f
 		cv::Point2f p [TRACKER_COUNT]; //Trackers position
 		cv::Point2f v [TRACKER_COUNT]; //Trackers delta
 		int t [TRACKER_COUNT]; //Trackers tracked time
 		int u [TRACKER_COUNT]; //Trackers untracked time
-		float proximity;
-		int persistence;
-		int confidence;
 	} tracker;
 	struct cm_4way way;
 	memset (&way, 0, sizeof (way));
 	memset (&tracker, 0, sizeof (tracker));
-	tracker.proximity = 10.0f;
-	tracker.persistence = 100;
-	tracker.confidence = 40;
-	ASSERT (tracker.confidence < tracker.persistence);
 	
 	while (1)
 	{
@@ -232,8 +229,28 @@ int main(int argc, char *argv[])
 			cv::cvtColor (m_b, m_render, cv::COLOR_GRAY2BGR);
 			Blobber->detect (m_b, Targets);
 			
-			cm_track (Targets, tracker.p, tracker.v, tracker.t, tracker.u, TRACKER_COUNT, tracker.proximity, tracker.persistence);
-			bool counted = cm_countman (tracker.p, tracker.v, tracker.u, tracker.t, TRACKER_COUNT, way, tracker.persistence, tracker.confidence);
+			cm_track 
+			(
+				Targets, 
+				tracker.p, 
+				tracker.v, 
+				tracker.t, 
+				tracker.u, 
+				TRACKER_COUNT, 
+				TRACKER_PROXIMITY, 
+				TRACKER_PERSISTENCE
+			);
+			bool counted = cm_countman 
+			(
+				tracker.p, 
+				tracker.v, 
+				tracker.t, 
+				tracker.u, 
+				TRACKER_COUNT, 
+				way, 
+				TRACKER_BORDER_PERSISTENCE, 
+				TRACKER_BORDER_CONFIDENCE
+			);
 			if (counted) {cm_4way_print (way);}
 	
 			for (size_t i = 0; i < Targets.size (); i++)
@@ -243,12 +260,13 @@ int main(int argc, char *argv[])
 			
 			for (size_t i = 0; i < TRACKER_COUNT; i++)
 			{
-				char text [2];
-				snprintf (text, 2, "%d", i);
+				char text [12];
+				snprintf (text, 12, "%d %d %d", i, tracker.t [i], tracker.u [i]);
 				cv::putText (m_render, text, tracker.p [i] + cv::Point2f (-3.0f, 3.0f), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.4, cv::Scalar (0, 0, 255), 1);	
-				if (tracker.u [i] < tracker.persistence)
+				if (tracker.u [i] < TRACKER_PERSISTENCE)
 				{
-					if (tracker.t [i] < tracker.confidence)
+					cv::line (m_render, tracker.p [i], tracker.p [i] + (tracker.v [i] * 30.0f), cv::Scalar (0, 255, 100));
+					if (tracker.t [i] < TRACKER_BORDER_CONFIDENCE)
 					{
 						cv::circle (m_render, tracker.p [i], 6.0f, cv::Scalar (255, 0, 0), 1);
 					}

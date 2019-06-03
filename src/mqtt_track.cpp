@@ -52,10 +52,14 @@ int main(int argc, char *argv[])
 	struct
 	{
 		#define TRACKER_COUNT 4
-		cv::Point2f p [TRACKER_COUNT]; //Position
-		cv::Point2f v [TRACKER_COUNT]; //Delta
-		int pe [TRACKER_COUNT]; //Persistance
-		int t [TRACKER_COUNT]; //Time tracked
+		#define TRACKER_PERSISTENCE 100
+		#define TRACKER_BORDER_PERSISTENCE 40
+		#define TRACKER_BORDER_CONFIDENCE 40
+		#define TRACKER_PROXIMITY 40.0f
+		cv::Point2f p [TRACKER_COUNT]; //Trackers position
+		cv::Point2f v [TRACKER_COUNT]; //Trackers delta
+		int t [TRACKER_COUNT]; //Trackers tracked time
+		int u [TRACKER_COUNT]; //Trackers untracked time
 	} tracker;
 	struct cm_4way way;
 	memset (&way, 0, sizeof (way));
@@ -73,15 +77,40 @@ int main(int argc, char *argv[])
 		Subtractor->apply (m_source, m_fg);
 		cv::GaussianBlur (m_fg, m_b, cv::Size (11, 11), 3.5, 3.5);
 		Blobber->detect (m_b, Targets);
-		cm_track (Targets, tracker.p, tracker.v, tracker.pe, tracker.t, TRACKER_COUNT);
-		bool counted = cm_countman (tracker.p, tracker.v, tracker.pe, tracker.t, TRACKER_COUNT, way);
+		
+		cm_track 
+		(
+			Targets, 
+			tracker.p, 
+			tracker.v, 
+			tracker.t, 
+			tracker.u, 
+			TRACKER_COUNT, 
+			TRACKER_PROXIMITY, 
+			TRACKER_PERSISTENCE
+		);
+		bool counted = cm_countman 
+		(
+			tracker.p, 
+			tracker.v, 
+			tracker.t, 
+			tracker.u, 
+			TRACKER_COUNT, 
+			way, 
+			TRACKER_BORDER_PERSISTENCE, 
+			TRACKER_BORDER_CONFIDENCE
+		);
 		if (counted) {cm_4way_print (way);}
+		
 		for (size_t i = 0; i < TRACKER_COUNT; i++)
 		{
 			if (tracker.t [i] != -1) {continue;}
 			printf ("Tracker %i departured\n", i);
-			memset (&tracker, 0, sizeof (tracker));
+			//Reset target
+			tracker.v [i] = {0.0f, 0.0f};
 			tracker.p [i] = {(float)LEP3_W / 2.0f, (float)LEP3_H / 2.0f};
+			tracker.t [i] = 0;
+			tracker.u [i] = 0;
 		}
 	}
 	return 0;
