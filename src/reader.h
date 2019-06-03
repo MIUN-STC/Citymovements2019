@@ -10,9 +10,9 @@ int reader (void * ptr)
 	while (1)
 	{
 		uint16_t img [LEP3_WH];
-		int r = read (STDIN_FILENO, img, sizeof(img));
-		ASSERT_F (r == sizeof(img), "read () error. Read %d of %d", r, sizeof(img));
-		if (SDL_AtomicGet (&reader_atomic) == 0)
+		int r = fread (img, sizeof (img), 1, stdin);
+		//ASSERT_F (r == 1, "fread () %i", r);
+		if (r == 1 && SDL_AtomicGet (&reader_atomic) == 0)
 		{
 			memcpy (ptr, img, sizeof (img));
 			SDL_AtomicAdd (&reader_atomic, 1);
