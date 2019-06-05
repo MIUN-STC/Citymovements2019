@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
 		#define TRACKER_PERSISTENCE 100
 		#define TRACKER_BORDER_PERSISTENCE 40
 		#define TRACKER_BORDER_CONFIDENCE 40
-		#define TRACKER_PROXIMITY 40.0f
+		#define TRACKER_PROXIMITY 30.0f
 		cv::Point2f p [TRACKER_COUNT]; //Tracker position (x, y)
 		cv::Point2f v [TRACKER_COUNT]; //Tracker velocity vector (dx, dy)
 		int t [TRACKER_COUNT]; //Tracker tracking time for (t >= 0), departed for (t = -1)
@@ -224,10 +224,10 @@ int main(int argc, char *argv[])
 				tracker.t, //Tracking time for (t >= 0), departed for (t = -1)
 				tracker.u, //Untracking time for (y >= 0)
 				TRACKER_COUNT, 
-				TRACKER_PROXIMITY, 
+				TRACKER_PROXIMITY*TRACKER_PROXIMITY, 
 				TRACKER_PERSISTENCE
 			);
-			bool counted = cm_countman 
+			uint32_t counted = cm_countman 
 			(
 				tracker.p, //Position (x, y)
 				tracker.v, //Velocity vector (dx, dy)
@@ -238,18 +238,18 @@ int main(int argc, char *argv[])
 				TRACKER_BORDER_PERSISTENCE, 
 				TRACKER_BORDER_CONFIDENCE
 			);
-			if (counted) {cm_4way_print (way);}
+			if (counted > 0) {cm_4way_print (way);}
 	
 			for (size_t i = 0; i < Targets.size (); i++)
 			{
-				cv::circle (m_render, Targets [i].pt, 6.0f, cv::Scalar (0, 255, 0), 1);
+				cv::drawMarker (m_render, Targets [i].pt, cv::Scalar (200, 100, 0), cv::MARKER_CROSS, 6);
 			}
 			
 			for (size_t i = 0; i < TRACKER_COUNT; i++)
 			{
 				char text [12];
 				snprintf (text, 12, "%d %d %d", i, tracker.t [i], tracker.u [i]);
-				cv::putText (m_render, text, tracker.p [i] + cv::Point2f (-3.0f, 3.0f), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.4, cv::Scalar (0, 0, 255), 1);	
+				cv::putText (m_render, text, tracker.p [i] + cv::Point2f (-3.0f, 3.0f), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.3, cv::Scalar (0, 0, 255), 1);	
 				if (tracker.u [i] < TRACKER_PERSISTENCE)
 				{
 					//Draw velocity vector (dx, dy) line.
@@ -257,12 +257,12 @@ int main(int argc, char *argv[])
 					if (tracker.t [i] < TRACKER_BORDER_CONFIDENCE)
 					{
 						//This tracker can not depart.
-						cv::circle (m_render, tracker.p [i], 6.0f, cv::Scalar (255, 0, 0), 1);
+						cv::circle (m_render, tracker.p [i], TRACKER_PROXIMITY, cv::Scalar (44, 0, 0), 1);
 					}
 					else
 					{
 						//This tracker might depart.
-						cv::circle (m_render, tracker.p [i], 6.0f, cv::Scalar (255, 100, 50), 1);
+						cv::circle (m_render, tracker.p [i], TRACKER_PROXIMITY, cv::Scalar (0, 100, 10), 1);
 					}
 				}
 			}

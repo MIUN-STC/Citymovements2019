@@ -29,7 +29,7 @@ float dot2 (cv::Point2f const &a) {return a.dot (a);}
 //Tracker position and input target can be used to calculate tracker to target velocity.
 //Tracker position can be used to check if the target is close to border.
 //Input target keypoints is discontinuous target coordinate of interest that we want to track.
-//Proximity: How close the tracker can track a target.
+//r2: How close the tracker can track a target.
 //Persistence: How long time a non tracking tracker should look for a target in proximity.
 void cm_track 
 (
@@ -39,7 +39,7 @@ void cm_track
 	int t [], //Tracking time
 	int u [], //Untracking time
 	uint32_t n,//Number of tracker
-	float proximity = 10.0f,
+	float r2 = 10.0f,
 	int persistence = 100
 )
 {
@@ -66,7 +66,7 @@ void cm_track
 			float l = dot2 (p [j] - kp [i].pt);
 			//It is very important to update used trackers also.
 			//If the tracker is being used then only track the target in proximity.
-			if ((u [j] < persistence) && (l > proximity)) {continue;};
+			if ((u [j] < persistence) && (l > r2)) {continue;};
 			if (l < lmin)
 			{
 				lmin = l;
@@ -74,7 +74,7 @@ void cm_track
 			}
 		}
 		if (jmin < 0) {continue;};
-		if (lmin > proximity)
+		if (lmin > r2)
 		{
 			t [jmin] = 0;
 			v [jmin] = {0.0f, 0.0f};
@@ -101,7 +101,7 @@ struct cm_4way
 };
 
 
-bool cm_countman 
+uint32_t cm_countman 
 (
 	cv::Point2f p [], //Tracker position
 	cv::Point2f v [], //Tracker velocity
@@ -113,7 +113,7 @@ bool cm_countman
 	int confidence
 )
 {
-	bool departed_any = false;
+	uint32_t departed_count = 0;
 	while (n--)
 	{
 		//Make sure that the target is realy gone.
@@ -166,10 +166,10 @@ bool cm_countman
 			//Trackers with negative one tracking time duration
 			//is trackers that thinks that the target left the premise.
 			t [n] = -1;
-			departed_any = true;
+			departed_count ++;
 		}
 	}
-	return departed_any;
+	return departed_count;
 }
 
 

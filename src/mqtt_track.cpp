@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
 			TRACKER_PROXIMITY, 
 			TRACKER_PERSISTENCE
 		);
-		bool counted = cm_countman 
+		uint32_t counted = cm_countman 
 		(
 			tracker.p, 
 			tracker.v, 
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 			TRACKER_BORDER_PERSISTENCE, 
 			TRACKER_BORDER_CONFIDENCE
 		);
-		if (counted) {cm_4way_print (way);}
+		if (counted > 0) {cm_4way_print (way);}
 		
 		for (size_t i = 0; i < TRACKER_COUNT; i++)
 		{
