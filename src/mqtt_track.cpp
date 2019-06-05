@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 			tracker.t, 
 			tracker.u, 
 			TRACKER_COUNT, 
-			TRACKER_PROXIMITY, 
+			TRACKER_PROXIMITY*TRACKER_PROXIMITY, 
 			TRACKER_PERSISTENCE
 		);
 		uint32_t counted = cm_countman 
