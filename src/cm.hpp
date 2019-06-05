@@ -34,22 +34,22 @@ float dot2 (cv::Point2f const &a) {return a.dot (a);}
 void cm_track 
 (
 	std::vector<cv::KeyPoint>& kp, //Input target keypoints
-	cv::Point2f p [], //Tracker position
-	cv::Point2f v [], //Tracker velocity
-	int t [], //Tracking time
-	int u [], //Untracking time
+	cv::Point2f p [], //Tracker position (x, y)
+	cv::Point2f v [], //Tracker velocity vector (dx, dy)
+	int t [], //Tracker tracking duration
+	int u [], //Tracker untracking duration
 	uint32_t n,//Number of tracker
-	float r2 = 10.0f,
+	float r2 = 10.0f,//Tracker target search proximity radius as r^2.
 	int persistence = 100
 )
 {
 	for (size_t i = 0; i < n; i++)
 	{
 		v [i] = v [i] * 0.95f;
-		//Reset tracker if the tracker has not seen a target for a while.
 		u [i] ++;
 		if (u [i] > persistence)
 		{
+			//Reset tracker if it could'nt find any targets:
 			t [i] = 0;
 			v [i] = {0.0f, 0.0f};
 		}
@@ -57,15 +57,14 @@ void cm_track
 
 	for (size_t i = 0; i < kp.size (); i++)
 	{
-		//Find a (target,tracker) pair
-		//int j = cm_pair (p, t, u, n, kp [i], proximity, persistence);
+		//Find a (target, tracker) pair (i, jmin):
 		int jmin = -1;
 		float lmin = FLT_MAX;
 		for (size_t j = 0; j < n; j++)
 		{
 			float l = dot2 (p [j] - kp [i].pt);
-			//It is very important to update used trackers also.
-			//If the tracker is being used then only track the target in proximity.
+			//If untracking duration (u) is too large then search everywhere.
+			//If untracking duration (u) is low enough then search inside proximity circle (r2).
 			if ((u [j] < persistence) && (l > r2)) {continue;};
 			if (l < lmin)
 			{
@@ -73,20 +72,24 @@ void cm_track
 				jmin = (int)j;
 			}
 		}
+		//Check if a (target, tracker) pair was found:
 		if (jmin < 0) {continue;};
 		if (lmin > r2)
 		{
+			//If the target was found outside the target search proximity radius then reset the tracker:
 			t [jmin] = 0;
 			v [jmin] = {0.0f, 0.0f};
 		}
 		else
 		{
-			//Save smoothed delta vector between target and tracker.
+			//Smooting target to tracker velocity vector (v):
 			v [jmin] = 0.9f * v [jmin] + (kp [i].pt - p [jmin]) * 0.1f;
-			t [jmin] ++;// Increment tracking duration.
+			t [jmin] ++;// Increment tracking duration (t).
 		}
-		p [jmin] = kp [i].pt;// Move tracker to target.
-		u [jmin] = 0;// Reset untracked duration.
+		//Move tracker (jmin) to targets (i) position (pt):
+		p [jmin] = kp [i].pt;
+		//Reset untracked duration (u):
+		u [jmin] = 0;
 	}
 }
 
@@ -163,8 +166,7 @@ uint32_t cm_countman
 		
 		if (departed)
 		{
-			//Trackers with negative one tracking time duration
-			//is trackers that thinks that the target left the premise.
+			//Use tracking duration (t) as (-1) when the tracker (n) is departed.
 			t [n] = -1;
 			departed_count ++;
 		}
