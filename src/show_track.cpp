@@ -24,13 +24,13 @@
 
 #define APP_TEX_COUNT 1
 
-#define APP_RENDER_C          1
-#define APP_RENDER_TYPE       GL_UNSIGNED_BYTE
-#define APP_RENDER_FORMAT     GL_RGB
-#define APP_RENDER_INTFORMAT  GL_RGB
-#define APP_RENDER_UNIT       0
-#define APP_RENDER_MAG_FILTER GL_NEAREST
-//#define APP_RENDER_MAG_FILTER GL_LINEAR
+#define APP_VISUAL_C          1
+#define APP_VISUAL_TYPE       GL_UNSIGNED_BYTE
+#define APP_VISUAL_FORMAT     GL_RGB
+#define APP_VISUAL_INTFORMAT  GL_RGB
+#define APP_VISUAL_UNIT       0
+#define APP_VISUAL_MAG_FILTER GL_NEAREST
+//#define APP_VISUAL_MAG_FILTER GL_LINEAR
 
 #define APP_WIN_X SDL_WINDOWPOS_UNDEFINED
 #define APP_WIN_Y SDL_WINDOWPOS_UNDEFINED
@@ -107,23 +107,23 @@ int main(int argc, char *argv[])
 	glEnable (GL_BLEND);
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	cv::Mat m_source (LEP3_H, LEP3_W, CV_16U);
-	cv::Mat m_fg (LEP3_H, LEP3_W, CV_8U);
-	cv::Mat m_b (LEP3_H, LEP3_W, CV_8U);
-	cv::Mat m_render (LEP3_H, LEP3_W, CV_8UC3);
-	reader_start (m_source.ptr ());
+	cv::Mat mat_source (LEP3_H, LEP3_W, CV_16U);
+	cv::Mat mat_fg (LEP3_H, LEP3_W, CV_8U);
+	cv::Mat mat_b (LEP3_H, LEP3_W, CV_8U);
+	cv::Mat mat_visual (LEP3_H, LEP3_W, CV_8UC3);
+	reader_start (mat_source.ptr ());
 	
 	//Setup OpenGL texture
 	GLuint tex [APP_TEX_COUNT];
 	glGenTextures (APP_TEX_COUNT, tex);
-	glActiveTexture (GL_TEXTURE0 + APP_RENDER_UNIT);
-	glBindTexture (GL_TEXTURE_2D, tex [APP_RENDER_UNIT]);
-	xgl_uniform1i_set (program, "tex", APP_RENDER_UNIT);
+	glActiveTexture (GL_TEXTURE0 + APP_VISUAL_UNIT);
+	glBindTexture (GL_TEXTURE_2D, tex [APP_VISUAL_UNIT]);
+	xgl_uniform1i_set (program, "tex", APP_VISUAL_UNIT);
 	//glPixelStorei(GL_UNPACK_ALIGNMENT, (M2.step & 3) ? 1 : 4);
-	glTexImage2D (GL_TEXTURE_2D, 0, APP_RENDER_INTFORMAT, LEP3_W, LEP3_H, 0, APP_RENDER_FORMAT, APP_RENDER_TYPE, NULL);
+	glTexImage2D (GL_TEXTURE_2D, 0, APP_VISUAL_INTFORMAT, LEP3_W, LEP3_H, 0, APP_VISUAL_FORMAT, APP_VISUAL_TYPE, NULL);
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, APP_RENDER_MAG_FILTER);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, APP_VISUAL_MAG_FILTER);
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
 	glGenerateMipmap (GL_TEXTURE_2D);
 	
@@ -209,12 +209,12 @@ int main(int argc, char *argv[])
 			{
 				int w, h;
 				SDL_GetWindowSize(window,&w,&h);
-				cv::circle (m_source, cv::Point2i (x*LEP3_W/w, y*LEP3_H/h), 6.0f, cv::Scalar (255), -1);
+				cv::circle (mat_source, cv::Point2i (x*LEP3_W/w, y*LEP3_H/h), 6.0f, cv::Scalar (255), -1);
 			}
-			Subtractor->apply (m_source, m_fg);
-			cv::GaussianBlur (m_fg, m_b, cv::Size (11, 11), 3.5, 3.5);
-			cv::cvtColor (m_b, m_render, cv::COLOR_GRAY2BGR);
-			Blobber->detect (m_b, Targets);
+			Subtractor->apply (mat_source, mat_fg);
+			cv::GaussianBlur (mat_fg, mat_b, cv::Size (11, 11), 3.5, 3.5);
+			cv::cvtColor (mat_b, mat_visual, cv::COLOR_GRAY2BGR);
+			Blobber->detect (mat_b, Targets);
 			
 			cm_track 
 			(
@@ -242,27 +242,27 @@ int main(int argc, char *argv[])
 	
 			for (size_t i = 0; i < Targets.size (); i++)
 			{
-				cv::drawMarker (m_render, Targets [i].pt, cv::Scalar (200, 100, 0), cv::MARKER_CROSS, 6);
+				cv::drawMarker (mat_visual, Targets [i].pt, cv::Scalar (200, 100, 0), cv::MARKER_CROSS, 6);
 			}
 			
 			for (size_t i = 0; i < TRACKER_COUNT; i++)
 			{
 				char text [12];
 				snprintf (text, 12, "%d %d %d", i, tracker.t [i], tracker.u [i]);
-				cv::putText (m_render, text, tracker.p [i] + cv::Point2f (-3.0f, 3.0f), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.3, cv::Scalar (0, 0, 255), 1);	
+				cv::putText (mat_visual, text, tracker.p [i] + cv::Point2f (-3.0f, 3.0f), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.3, cv::Scalar (0, 0, 255), 1);	
 				if (tracker.u [i] < TRACKER_PERSISTENCE)
 				{
 					//Draw velocity vector (dx, dy) line.
-					cv::line (m_render, tracker.p [i], tracker.p [i] + (tracker.v [i] * 30.0f), cv::Scalar (0, 255, 100));
+					cv::line (mat_visual, tracker.p [i], tracker.p [i] + (tracker.v [i] * 30.0f), cv::Scalar (0, 255, 100));
 					if (tracker.t [i] < TRACKER_BORDER_CONFIDENCE)
 					{
 						//This tracker can not depart.
-						cv::circle (m_render, tracker.p [i], TRACKER_PROXIMITY, cv::Scalar (44, 0, 0), 1);
+						cv::circle (mat_visual, tracker.p [i], TRACKER_PROXIMITY, cv::Scalar (44, 0, 0), 1);
 					}
 					else
 					{
 						//This tracker might depart.
-						cv::circle (m_render, tracker.p [i], TRACKER_PROXIMITY, cv::Scalar (0, 100, 10), 1);
+						cv::circle (mat_visual, tracker.p [i], TRACKER_PROXIMITY, cv::Scalar (0, 100, 10), 1);
 					}
 				}
 			}
@@ -278,18 +278,18 @@ int main(int argc, char *argv[])
 				tracker.u [i] = 0;
 			}
 			
-			cv::rectangle (m_render, CM_N, cv::Scalar (255, 0, 255));
-			cv::rectangle (m_render, CM_S, cv::Scalar (255, 0, 255));
-			cv::rectangle (m_render, CM_W, cv::Scalar (255, 0, 255));
-			cv::rectangle (m_render, CM_E, cv::Scalar (255, 0, 255));
-			cv::rectangle (m_render, CM_NE, cv::Scalar (255, 0, 255));
-			cv::rectangle (m_render, CM_NW, cv::Scalar (255, 0, 255));
-			cv::rectangle (m_render, CM_SE, cv::Scalar (255, 0, 255));
-			cv::rectangle (m_render, CM_SW, cv::Scalar (255, 0, 255));
+			cv::rectangle (mat_visual, CM_N, cv::Scalar (255, 0, 255));
+			cv::rectangle (mat_visual, CM_S, cv::Scalar (255, 0, 255));
+			cv::rectangle (mat_visual, CM_W, cv::Scalar (255, 0, 255));
+			cv::rectangle (mat_visual, CM_E, cv::Scalar (255, 0, 255));
+			cv::rectangle (mat_visual, CM_NE, cv::Scalar (255, 0, 255));
+			cv::rectangle (mat_visual, CM_NW, cv::Scalar (255, 0, 255));
+			cv::rectangle (mat_visual, CM_SE, cv::Scalar (255, 0, 255));
+			cv::rectangle (mat_visual, CM_SW, cv::Scalar (255, 0, 255));
 		
 			glBindTexture (GL_TEXTURE_2D, tex [0]);
 			
-			glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, LEP3_W, LEP3_H, APP_RENDER_FORMAT, APP_RENDER_TYPE, m_render.ptr ());
+			glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, LEP3_W, LEP3_H, APP_VISUAL_FORMAT, APP_VISUAL_TYPE, mat_visual.ptr ());
 			
 			glClear (GL_COLOR_BUFFER_BIT);
 			glDrawElements (GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);

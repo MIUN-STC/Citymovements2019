@@ -65,18 +65,18 @@ int main(int argc, char *argv[])
 	memset (&way, 0, sizeof (way));
 	memset (&tracker, 0, sizeof (tracker));
 	
-	cv::Mat m_source (LEP3_H, LEP3_W, CV_16U);
-	cv::Mat m_fg (LEP3_H, LEP3_W, CV_8U);
-	cv::Mat m_b (LEP3_H, LEP3_W, CV_8U);
+	cv::Mat mat_source (LEP3_H, LEP3_W, CV_16U);
+	cv::Mat mat_fg (LEP3_H, LEP3_W, CV_8U);
+	cv::Mat mat_b (LEP3_H, LEP3_W, CV_8U);
 	
 	printf ("While loop start\n");
 	while (1)
 	{
-		int r = fread (m_source.ptr (), LEP3_WH*sizeof(uint16_t), 1, stdin);
+		int r = fread (mat_source.ptr (), LEP3_WH*sizeof(uint16_t), 1, stdin);
 		if (r != 1) {fprintf (stderr, "Reading the frame from stdin is not correct size\n");}
-		Subtractor->apply (m_source, m_fg);
-		cv::GaussianBlur (m_fg, m_b, cv::Size (11, 11), 3.5, 3.5);
-		Blobber->detect (m_b, Targets);
+		Subtractor->apply (mat_source, mat_fg);
+		cv::GaussianBlur (mat_fg, mat_b, cv::Size (11, 11), 3.5, 3.5);
+		Blobber->detect (mat_b, Targets);
 		
 		cm_track 
 		(
