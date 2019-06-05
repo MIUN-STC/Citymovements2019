@@ -72,8 +72,8 @@ int main(int argc, char *argv[])
 	printf ("While loop start\n");
 	while (1)
 	{
-		int r = read (STDIN_FILENO, m_source.ptr (), LEP3_WH*sizeof(uint16_t));
-		if (r != LEP3_WH*sizeof(uint16_t)) {fprintf (stderr, "Reading the frame from stdin is not correct size\n");}
+		int r = fread (m_source.ptr (), LEP3_WH*sizeof(uint16_t), 1, stdin);
+		if (r != 1) {fprintf (stderr, "Reading the frame from stdin is not correct size\n");}
 		Subtractor->apply (m_source, m_fg);
 		cv::GaussianBlur (m_fg, m_b, cv::Size (11, 11), 3.5, 3.5);
 		Blobber->detect (m_b, Targets);
