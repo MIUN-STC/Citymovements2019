@@ -154,3 +154,23 @@ void xgl_program_print (GLuint program)
 	}
 	fflush (f);
 }
+
+
+void xglVertexAttribPointer
+(
+	GLuint program,
+	const GLchar *name,
+	GLint size,
+	GLenum type,
+	GLboolean normalized,
+	GLsizei stride,
+	const GLvoid * pointer
+)
+{
+	GLint loc = glGetAttribLocation (program, name);
+	ASSERT (loc >= 0);
+	printf ("loc %i \n", loc);
+	glVertexAttribPointer ((GLuint)loc, size, type, normalized, stride, pointer);
+	glEnableVertexAttribArray ((GLuint)loc);
+	XGL_ASSERT_ERROR;
+}

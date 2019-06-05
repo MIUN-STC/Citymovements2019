@@ -79,15 +79,16 @@ int main(int argc, char *argv[])
 	GLuint ebo;
 	GLuint program;
 	
-	program = glCreateProgram ();XGL_ASSERT_ERROR;
+	program = glCreateProgram ();
 	xgl_attach_shaderfile (program, APP_SHADERF, GL_FRAGMENT_SHADER);
 	xgl_attach_shaderfile (program, APP_SHADERV, GL_VERTEX_SHADER);
-	glLinkProgram (program);XGL_ASSERT_ERROR;
-	glUseProgram (program);XGL_ASSERT_ERROR;
+	glLinkProgram (program);
+	glUseProgram (program);
 	xgl_program_print (program);
 	
 	float vertices [] = 
-	{   //x      y     s      t
+	{
+		//x      y     s      t
 		-1.0f, -1.0f, 0.0f,  1.0f, // BL
 		-1.0f,  1.0f, 0.0f,  0.0f, // TL
 		 1.0f,  1.0f, 1.0f,  0.0f, // TR
@@ -95,28 +96,16 @@ int main(int argc, char *argv[])
 	};
 	const GLint indicies [] = {0, 1, 2, 0, 2, 3};
 	
-	glGenBuffers (1, &(vbo));XGL_ASSERT_ERROR;
-	glBindBuffer (GL_ARRAY_BUFFER, vbo);XGL_ASSERT_ERROR;
-	glBufferData (GL_ARRAY_BUFFER, sizeof (vertices), vertices, GL_STATIC_DRAW);XGL_ASSERT_ERROR;
-	glGenBuffers (1, &(ebo));XGL_ASSERT_ERROR;
-	glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, ebo);XGL_ASSERT_ERROR;
-	glBufferData (GL_ELEMENT_ARRAY_BUFFER, sizeof (indicies), indicies, GL_STATIC_DRAW);XGL_ASSERT_ERROR;
-	{
-		GLint pos_attr_loc = glGetAttribLocation (program, "in_Position");
-		ASSERT (pos_attr_loc >= 0);
-		printf ("pos_attr_loc %i \n", pos_attr_loc);
-		glVertexAttribPointer ((GLuint)pos_attr_loc, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)0);
-		glEnableVertexAttribArray ((GLuint)pos_attr_loc);
-		GLint tex_attr_loc = glGetAttribLocation (program, "in_Texcoord");
-		ASSERT (tex_attr_loc >= 0);
-		printf ("tex_attr_loc %i \n", tex_attr_loc);
-		glVertexAttribPointer ((GLuint)tex_attr_loc, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(2*sizeof(GLfloat)));
-		glEnableVertexAttribArray ((GLuint)tex_attr_loc);
-	}
-	glUseProgram (program);XGL_ASSERT_ERROR;
-	glEnable (GL_BLEND);XGL_ASSERT_ERROR;
-	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);XGL_ASSERT_ERROR;
-	
+	glGenBuffers (1, &(vbo));
+	glBindBuffer (GL_ARRAY_BUFFER, vbo);
+	glBufferData (GL_ARRAY_BUFFER, sizeof (vertices), vertices, GL_STATIC_DRAW);
+	glGenBuffers (1, &(ebo));
+	glBindBuffer (GL_ELEMENT_ARRAY_BUFFER, ebo);
+	glBufferData (GL_ELEMENT_ARRAY_BUFFER, sizeof (indicies), indicies, GL_STATIC_DRAW);
+	xglVertexAttribPointer (program, "pos", 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)0);
+	glUseProgram (program);
+	glEnable (GL_BLEND);
+	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	cv::Mat m_source (LEP3_H, LEP3_W, CV_16U);
 	cv::Mat m_fg (LEP3_H, LEP3_W, CV_8U);
@@ -124,22 +113,20 @@ int main(int argc, char *argv[])
 	cv::Mat m_render (LEP3_H, LEP3_W, CV_8UC3);
 	reader_start (m_source.ptr ());
 	
-	
-	//Generate texture id for Lepton and Pallete.
+	//Setup OpenGL texture
 	GLuint tex [APP_TEX_COUNT];
-	glGenTextures (APP_TEX_COUNT, tex);XGL_ASSERT_ERROR;
-	//Setup Lepton texture format.
-	glActiveTexture (GL_TEXTURE0 + APP_RENDER_UNIT);XGL_ASSERT_ERROR;
-	glBindTexture (GL_TEXTURE_2D, tex [APP_RENDER_UNIT]);XGL_ASSERT_ERROR;
+	glGenTextures (APP_TEX_COUNT, tex);
+	glActiveTexture (GL_TEXTURE0 + APP_RENDER_UNIT);
+	glBindTexture (GL_TEXTURE_2D, tex [APP_RENDER_UNIT]);
 	xgl_uniform1i_set (program, "tex", APP_RENDER_UNIT);
 	//glPixelStorei(GL_UNPACK_ALIGNMENT, (M2.step & 3) ? 1 : 4);
-	glTexImage2D (GL_TEXTURE_2D, 0, APP_RENDER_INTFORMAT, LEP3_W, LEP3_H, 0, APP_RENDER_FORMAT, APP_RENDER_TYPE, NULL);XGL_ASSERT_ERROR;
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);XGL_ASSERT_ERROR;
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);XGL_ASSERT_ERROR;
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, APP_RENDER_MAG_FILTER);XGL_ASSERT_ERROR;
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); XGL_ASSERT_ERROR;
-	glGenerateMipmap (GL_TEXTURE_2D);XGL_ASSERT_ERROR;
-
+	glTexImage2D (GL_TEXTURE_2D, 0, APP_RENDER_INTFORMAT, LEP3_W, LEP3_H, 0, APP_RENDER_FORMAT, APP_RENDER_TYPE, NULL);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, APP_RENDER_MAG_FILTER);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
+	glGenerateMipmap (GL_TEXTURE_2D);
+	
 	cv::SimpleBlobDetector::Params Params;
 	Params.minThreshold = 60;
 	Params.maxThreshold = 255;
@@ -168,12 +155,12 @@ int main(int argc, char *argv[])
 		#define TRACKER_BORDER_PERSISTENCE 40
 		#define TRACKER_BORDER_CONFIDENCE 40
 		#define TRACKER_PROXIMITY 40.0f
-		cv::Point2f p [TRACKER_COUNT]; //Trackers position
-		cv::Point2f v [TRACKER_COUNT]; //Trackers delta
-		int t [TRACKER_COUNT]; //Trackers tracked time
-		int u [TRACKER_COUNT]; //Trackers untracked time
+		cv::Point2f p [TRACKER_COUNT]; //Tracker position (x, y)
+		cv::Point2f v [TRACKER_COUNT]; //Tracker velocity vector (dx, dy)
+		int t [TRACKER_COUNT]; //Tracker tracking time for (t >= 0), departed for (t = -1)
+		int u [TRACKER_COUNT]; //Tracker untracking time for (t >= 0)
 	} tracker;
-	struct cm_4way way;
+	struct cm_4way way; //North, East, West, South counter
 	memset (&way, 0, sizeof (way));
 	memset (&tracker, 0, sizeof (tracker));
 	
@@ -232,22 +219,22 @@ int main(int argc, char *argv[])
 			cm_track 
 			(
 				Targets, 
-				tracker.p, 
-				tracker.v, 
-				tracker.t, 
-				tracker.u, 
+				tracker.p, //Position (x, y)
+				tracker.v, //Velocity vector (dx, dy)
+				tracker.t, //Tracking time for (t >= 0), departed for (t = -1)
+				tracker.u, //Untracking time for (y >= 0)
 				TRACKER_COUNT, 
 				TRACKER_PROXIMITY, 
 				TRACKER_PERSISTENCE
 			);
 			bool counted = cm_countman 
 			(
-				tracker.p, 
-				tracker.v, 
-				tracker.t, 
-				tracker.u, 
+				tracker.p, //Position (x, y)
+				tracker.v, //Velocity vector (dx, dy)
+				tracker.t, //Tracking time for (t >= 0), departed for (t = -1)
+				tracker.u, //Untracking time for (y >= 0)
 				TRACKER_COUNT, 
-				way, 
+				way, //North, East, West, South counter
 				TRACKER_BORDER_PERSISTENCE, 
 				TRACKER_BORDER_CONFIDENCE
 			);
@@ -265,13 +252,16 @@ int main(int argc, char *argv[])
 				cv::putText (m_render, text, tracker.p [i] + cv::Point2f (-3.0f, 3.0f), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.4, cv::Scalar (0, 0, 255), 1);	
 				if (tracker.u [i] < TRACKER_PERSISTENCE)
 				{
+					//Draw velocity vector (dx, dy) line.
 					cv::line (m_render, tracker.p [i], tracker.p [i] + (tracker.v [i] * 30.0f), cv::Scalar (0, 255, 100));
 					if (tracker.t [i] < TRACKER_BORDER_CONFIDENCE)
 					{
+						//This tracker can not depart.
 						cv::circle (m_render, tracker.p [i], 6.0f, cv::Scalar (255, 0, 0), 1);
 					}
 					else
 					{
+						//This tracker might depart.
 						cv::circle (m_render, tracker.p [i], 6.0f, cv::Scalar (255, 100, 50), 1);
 					}
 				}
@@ -281,7 +271,7 @@ int main(int argc, char *argv[])
 			{
 				if (tracker.t [i] != -1) {continue;}
 				printf ("Tracker %i departured\n", i);
-				//Reset target
+				//Reset tracker
 				tracker.v [i] = {0.0f, 0.0f};
 				tracker.p [i] = {(float)LEP3_W / 2.0f, (float)LEP3_H / 2.0f};
 				tracker.t [i] = 0;
@@ -298,11 +288,11 @@ int main(int argc, char *argv[])
 			cv::rectangle (m_render, CM_SW, cv::Scalar (255, 0, 255));
 		
 			glBindTexture (GL_TEXTURE_2D, tex [0]);
-			XGL_ASSERT_ERROR;
+			
 			glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, LEP3_W, LEP3_H, APP_RENDER_FORMAT, APP_RENDER_TYPE, m_render.ptr ());
-			XGL_ASSERT_ERROR;
-			glClear (GL_COLOR_BUFFER_BIT);XGL_ASSERT_ERROR;
-			glDrawElements (GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);XGL_ASSERT_ERROR;
+			
+			glClear (GL_COLOR_BUFFER_BIT);
+			glDrawElements (GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
 			SDL_GL_SwapWindow (window);
 			SDL_AtomicSet (&reader_atomic, 0);
 		}
