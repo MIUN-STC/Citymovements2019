@@ -3,18 +3,25 @@
 
 
 //Departure zone size
-size_t const CM_Size = 10;
+#define CM_DEPARTURE_SIZE 10
 //Departure edge zones
-cv::Rect const CM_N (CM_Size, 0, LEP3_W - (CM_Size*2), CM_Size);
-cv::Rect const CM_S (CM_Size, LEP3_H - CM_Size, LEP3_W - (CM_Size*2), CM_Size);
-cv::Rect const CM_W (0, CM_Size, CM_Size, LEP3_H - (CM_Size*2));
-cv::Rect const CM_E (LEP3_W - CM_Size, CM_Size, CM_Size, LEP3_H - (CM_Size*2));
+cv::Rect const CM_N (CM_DEPARTURE_SIZE, 0, LEP3_W - (CM_DEPARTURE_SIZE*2), CM_DEPARTURE_SIZE);
+cv::Rect const CM_S (CM_DEPARTURE_SIZE, LEP3_H - CM_DEPARTURE_SIZE, LEP3_W - (CM_DEPARTURE_SIZE*2), CM_DEPARTURE_SIZE);
+cv::Rect const CM_W (0, CM_DEPARTURE_SIZE, CM_DEPARTURE_SIZE, LEP3_H - (CM_DEPARTURE_SIZE*2));
+cv::Rect const CM_E (LEP3_W - CM_DEPARTURE_SIZE, CM_DEPARTURE_SIZE, CM_DEPARTURE_SIZE, LEP3_H - (CM_DEPARTURE_SIZE*2));
 //Departure corner zones
-cv::Rect const CM_NW (0, 0, CM_Size, CM_Size);
-cv::Rect const CM_NE (LEP3_W - CM_Size, 0, CM_Size, CM_Size);
-cv::Rect const CM_SW (0, LEP3_H - CM_Size, CM_Size, CM_Size);
-cv::Rect const CM_SE (LEP3_W - CM_Size, LEP3_H - CM_Size, CM_Size, CM_Size);
+cv::Rect const CM_NW (0, 0, CM_DEPARTURE_SIZE, CM_DEPARTURE_SIZE);
+cv::Rect const CM_NE (LEP3_W - CM_DEPARTURE_SIZE, 0, CM_DEPARTURE_SIZE, CM_DEPARTURE_SIZE);
+cv::Rect const CM_SW (0, LEP3_H - CM_DEPARTURE_SIZE, CM_DEPARTURE_SIZE, CM_DEPARTURE_SIZE);
+cv::Rect const CM_SE (LEP3_W - CM_DEPARTURE_SIZE, LEP3_H - CM_DEPARTURE_SIZE, CM_DEPARTURE_SIZE, CM_DEPARTURE_SIZE);
+//Departure directions
+cv::Point2f const CM_VN (0.0f, -1.0f);
+cv::Point2f const CM_VS (0.0f, 1.0f);
+cv::Point2f const CM_VE (1.0f, 0.0f);
+cv::Point2f const CM_VW (-1.0f, 0.0f);
 
+float dot (cv::Point2f const &a, cv::Point2f const &b) {return a.dot (b);}
+float dot2 (cv::Point2f const &a) {return a.dot (a);}
 
 //Producing continuous moving trackers.
 //Tracking time can be used to filter out trackers that tracks noise.
@@ -56,7 +63,7 @@ void cm_track
 		float lmin = FLT_MAX;
 		for (size_t j = 0; j < n; j++)
 		{
-			float l = (float)cv::norm (p [j] - kp [i].pt);
+			float l = dot2 (p [j] - kp [i].pt);
 			//It is very important to update used trackers also.
 			//If the tracker is being used then only track the target in proximity.
 			if ((u [j] < persistence) && (l > proximity)) {continue;};
@@ -117,13 +124,9 @@ bool cm_countman
 		
 		//Flag variable for if the target has beed counted or not.
 		bool departed = false;
-		//Angle of the targets direction in degrees.
-		//TODO: Check if we can use dod product instead, 
-		//http://programmedlessons.org/VectorLessons/vch07/vch07_7.html
-		float a = atan2f (v [n].y, v [n].x);
-		float a360 = (180.0f / (float)M_PI) * a;
 		
 		//Check of the tracker are inside the departure zones.
+		//http://programmedlessons.org/VectorLessons/vch07/vch07_7.html
 		if (0) {}
 		else if (CM_N.contains (p [n])) {way.n ++; departed = true;}
 		else if (CM_S.contains (p [n])) {way.s ++; departed = true;}
@@ -131,25 +134,29 @@ bool cm_countman
 		else if (CM_E.contains (p [n])) {way.e ++; departed = true;}
 		else if (CM_NE.contains (p [n])) 
 		{
-			if (a360 < -45.0f) {way.n ++;}
+			bool north = dot (v [n], CM_VN) > dot (v [n], CM_VE);
+			if (north) {way.n ++;}
 			else {way.e ++;}
 			departed = true;
 		}
 		else if (CM_SE.contains (p [n])) 
 		{
-			if (a360 < 45.0f) {way.e ++;}
-			else {way.s ++;}
+			bool south = dot (v [n], CM_VS) > dot (v [n], CM_VE);
+			if (south) {way.s ++;}
+			else {way.e ++;}
 			departed = true;
 		}
 		else if (CM_NW.contains (p [n])) 
 		{
-			if (a360 < 255.0f) {way.w ++;}
-			else {way.n ++;}
+			bool north = dot (v [n], CM_VN) > dot (v [n], CM_VW);
+			if (north) {way.n ++;}
+			else {way.w ++;}
 			departed = true;
 		}
 		else if (CM_SW.contains (p [n])) 
 		{
-			if (a360 < 135.0f) {way.s ++;}
+			bool south = dot (v [n], CM_VS) > dot (v [n], CM_VW);
+			if (south) {way.s ++;}
 			else {way.w ++;}
 			departed = true;
 		}
