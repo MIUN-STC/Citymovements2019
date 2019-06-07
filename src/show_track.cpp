@@ -3,27 +3,23 @@
 #include <SDL2/SDL_opengles2.h>
 
 #include <stdio.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <unistd.h>
+#include <unistd.h> //getopt
 #include <vector>
-#include <errno.h>
+
 #include <opencv4/opencv2/core/core.hpp>
 #include <opencv4/opencv2/core/utility.hpp>
-#include <opencv4/opencv2/highgui/highgui.hpp>
 #include <opencv4/opencv2/imgproc/imgproc.hpp>
 #include <opencv4/opencv2/features2d/features2d.hpp>
 #include <opencv4/opencv2/video/background_segm.hpp>
 
-
 #include "debug.h"
 #include "xgl.h"
 #include "lepton.h"
-#include "reader.h"
+#include "threadcap.h"
 #include "cm.hpp"
+#include "shared.hpp"
 
 #define APP_TEX_COUNT 1
-
 #define APP_VISUAL_C          1
 #define APP_VISUAL_TYPE       GL_UNSIGNED_BYTE
 #define APP_VISUAL_FORMAT     GL_RGB
@@ -31,7 +27,6 @@
 #define APP_VISUAL_UNIT       0
 #define APP_VISUAL_MAG_FILTER GL_NEAREST
 //#define APP_VISUAL_MAG_FILTER GL_LINEAR
-
 #define APP_WIN_X SDL_WINDOWPOS_UNDEFINED
 #define APP_WIN_Y SDL_WINDOWPOS_UNDEFINED
 #define APP_WIN_W LEP3_W
@@ -106,12 +101,6 @@ int main(int argc, char *argv[])
 	glUseProgram (program);
 	glEnable (GL_BLEND);
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	cv::Mat mat_source (LEP3_H, LEP3_W, CV_16U);
-	cv::Mat mat_fg (LEP3_H, LEP3_W, CV_8U);
-	cv::Mat mat_b (LEP3_H, LEP3_W, CV_8U);
-	cv::Mat mat_visual (LEP3_H, LEP3_W, CV_8UC3);
-	reader_start (mat_source.ptr ());
 	
 	//Setup OpenGL texture
 	GLuint tex [APP_TEX_COUNT];
@@ -127,42 +116,26 @@ int main(int argc, char *argv[])
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
 	glGenerateMipmap (GL_TEXTURE_2D);
 	
-	cv::SimpleBlobDetector::Params Params;
-	Params.minThreshold = 60;
-	Params.maxThreshold = 255;
-	Params.filterByColor = false;
-	Params.blobColor = 100;
-	Params.filterByArea = true;
-	Params.minArea = 10;
-	Params.maxArea = 100;
-	Params.filterByCircularity = false;
-	Params.minCircularity = 0.1f;
-	Params.maxCircularity = 1.0;
-	Params.filterByConvexity = false;
-	Params.minConvexity = 0.0;
-	Params.maxConvexity = 0.5;
-	Params.filterByInertia = false;
-	Params.minInertiaRatio = 0.0;
-	Params.maxInertiaRatio = 0.5;
-	cv::Ptr<cv::BackgroundSubtractor> Subtractor = cv::createBackgroundSubtractorMOG2 ();
-	cv::Ptr<cv::SimpleBlobDetector> Blobber = cv::SimpleBlobDetector::create (Params);
-	std::vector<cv::KeyPoint> Targets;
 	
-	struct
-	{
-		#define TRACKER_COUNT 4
-		#define TRACKER_PERSISTENCE 100
-		#define TRACKER_BORDER_PERSISTENCE 40
-		#define TRACKER_BORDER_CONFIDENCE 40
-		#define TRACKER_PROXIMITY 30.0f
-		cv::Point2f p [TRACKER_COUNT]; //Tracker position (x, y)
-		cv::Point2f v [TRACKER_COUNT]; //Tracker velocity vector (dx, dy)
-		int t [TRACKER_COUNT]; //Tracker tracking time for (t >= 0), departed for (t = -1)
-		int u [TRACKER_COUNT]; //Tracker untracking time for (t >= 0)
-	} tracker;
+	cv::Ptr<cv::BackgroundSubtractor> subtractor;
+	cv::Ptr<cv::SimpleBlobDetector> blobber;
+	cv::Mat mat_source (LEP3_H, LEP3_W, CV_16U);
+	cv::Mat mat_fg (LEP3_H, LEP3_W, CV_8U);
+	cv::Mat mat_b (LEP3_H, LEP3_W, CV_8U);
+	cv::Mat mat_visual (LEP3_H, LEP3_W, CV_8UC3);
+	std::vector<cv::KeyPoint> kp;
+	struct stracker tracker;
 	struct cm_4way way; //North, East, West, South counter
-	memset (&way, 0, sizeof (way));
-	memset (&tracker, 0, sizeof (tracker));
+	
+	sinit
+	(
+		subtractor, //background subtraction
+		blobber, //blob detection
+		tracker, //
+		way //North, East, West, South counter
+	);
+	
+	threadcap_start (mat_source.ptr ());
 	
 	while (1)
 	{
@@ -202,7 +175,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		
-		if (SDL_AtomicGet (&reader_atomic))
+		if (SDL_AtomicGet (&threadcap_atomic))
 		{
 			int x, y;
 			if (SDL_GetMouseState(&x, &y) & SDL_BUTTON (SDL_BUTTON_LEFT))
@@ -211,71 +184,48 @@ int main(int argc, char *argv[])
 				SDL_GetWindowSize(window,&w,&h);
 				cv::circle (mat_source, cv::Point2i (x*LEP3_W/w, y*LEP3_H/h), 6.0f, cv::Scalar (255), -1);
 			}
-			Subtractor->apply (mat_source, mat_fg);
-			cv::GaussianBlur (mat_fg, mat_b, cv::Size (11, 11), 3.5, 3.5);
-			cv::cvtColor (mat_b, mat_visual, cv::COLOR_GRAY2BGR);
-			Blobber->detect (mat_b, Targets);
 			
-			cm_track 
+			sfilter
 			(
-				Targets, 
-				tracker.p, //Position (x, y)
-				tracker.v, //Velocity vector (dx, dy)
-				tracker.t, //Tracking time for (t >= 0), departed for (t = -1)
-				tracker.u, //Untracking time for (y >= 0)
-				TRACKER_COUNT, 
-				TRACKER_PROXIMITY*TRACKER_PROXIMITY, 
-				TRACKER_PERSISTENCE
+				subtractor, //background subtraction
+				blobber, //blob detection
+				mat_source, //camera source raw input
+				mat_fg, //foreground of background subtraction
+				mat_b, //blurred image
+				kp, //target keypoints
+				tracker, //
+				way
 			);
-			uint32_t counted = cm_countman 
-			(
-				tracker.p, //Position (x, y)
-				tracker.v, //Velocity vector (dx, dy)
-				tracker.t, //Tracking time for (t >= 0), departed for (t = -1)
-				tracker.u, //Untracking time for (y >= 0)
-				TRACKER_COUNT, 
-				way, //North, East, West, South counter
-				TRACKER_BORDER_PERSISTENCE, 
-				TRACKER_BORDER_CONFIDENCE
-			);
-			if (counted > 0) {cm_4way_print (way);}
-	
-			for (size_t i = 0; i < Targets.size (); i++)
+			
+			if (way.counted > 0) {cm_4way_print (way);}
+			
+			cv::cvtColor (mat_b, mat_visual, cv::COLOR_GRAY2BGR);
+			
+			for (size_t i = 0; i < kp.size (); i++)
 			{
-				cv::drawMarker (mat_visual, Targets [i].pt, cv::Scalar (200, 100, 0), cv::MARKER_CROSS, 6);
+				cv::drawMarker (mat_visual, kp [i].pt, cv::Scalar (200, 100, 0), cv::MARKER_CROSS, 6);
 			}
 			
-			for (size_t i = 0; i < TRACKER_COUNT; i++)
+			for (size_t i = 0; i < STRACKER_COUNT; i++)
 			{
 				char text [12];
 				snprintf (text, 12, "%d %d %d", i, tracker.t [i], tracker.u [i]);
 				cv::putText (mat_visual, text, tracker.p [i] + cv::Point2f (-3.0f, 3.0f), cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 0.3, cv::Scalar (0, 0, 255), 1);	
-				if (tracker.u [i] < TRACKER_PERSISTENCE)
+				if (tracker.u [i] < STRACKER_PERSISTENCE)
 				{
 					//Draw velocity vector (dx, dy) line.
 					cv::line (mat_visual, tracker.p [i], tracker.p [i] + (tracker.v [i] * 30.0f), cv::Scalar (0, 255, 100));
-					if (tracker.t [i] < TRACKER_BORDER_CONFIDENCE)
+					if (tracker.t [i] < STRACKER_BORDER_CONFIDENCE)
 					{
 						//This tracker can not depart.
-						cv::circle (mat_visual, tracker.p [i], TRACKER_PROXIMITY, cv::Scalar (44, 0, 0), 1);
+						cv::circle (mat_visual, tracker.p [i], STRACKER_PROXIMITY, cv::Scalar (44, 0, 0), 1);
 					}
 					else
 					{
 						//This tracker might depart.
-						cv::circle (mat_visual, tracker.p [i], TRACKER_PROXIMITY, cv::Scalar (0, 100, 10), 1);
+						cv::circle (mat_visual, tracker.p [i], STRACKER_PROXIMITY, cv::Scalar (0, 100, 10), 1);
 					}
 				}
-			}
-			
-			for (size_t i = 0; i < TRACKER_COUNT; i++)
-			{
-				if (tracker.t [i] != -1) {continue;}
-				printf ("Tracker %i departured\n", i);
-				//Reset tracker
-				tracker.v [i] = {0.0f, 0.0f};
-				tracker.p [i] = {(float)LEP3_W / 2.0f, (float)LEP3_H / 2.0f};
-				tracker.t [i] = 0;
-				tracker.u [i] = 0;
 			}
 			
 			cv::rectangle (mat_visual, CM_N, cv::Scalar (255, 0, 255));
@@ -288,13 +238,11 @@ int main(int argc, char *argv[])
 			cv::rectangle (mat_visual, CM_SW, cv::Scalar (255, 0, 255));
 		
 			glBindTexture (GL_TEXTURE_2D, tex [0]);
-			
 			glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, LEP3_W, LEP3_H, APP_VISUAL_FORMAT, APP_VISUAL_TYPE, mat_visual.ptr ());
-			
 			glClear (GL_COLOR_BUFFER_BIT);
 			glDrawElements (GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
 			SDL_GL_SwapWindow (window);
-			SDL_AtomicSet (&reader_atomic, 0);
+			SDL_AtomicSet (&threadcap_atomic, 0);
 		}
 	}
 	

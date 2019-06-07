@@ -101,77 +101,92 @@ struct cm_4way
 	uint32_t s;
 	uint32_t w;
 	uint32_t e;
+	uint32_t counted;
 };
 
 
-uint32_t cm_countman 
+void cm_countman 
 (
 	cv::Point2f p [], //Tracker position
 	cv::Point2f v [], //Tracker velocity
 	int t [], //Tracking duration
 	int u [], //Tracker persistence
 	uint32_t n, //Number of trackers
-	struct cm_4way &way, //Output people count,
-	int persistence,
-	int confidence
+	struct cm_4way &way, //Output people count
+	int persistence, //Departure requirement
+	int confidence //Departure requirement
 )
 {
-	uint32_t departed_count = 0;
 	while (n--)
 	{
-		//Make sure that the target is realy gone.
+		//Make sure that the target is really gone.
 		if (u [n] < persistence) {continue;}
 		
 		//Make sure that the target has not been tracking noise.
 		if (t [n] < confidence){continue;}
 		
-		//Flag variable for if the target has beed counted or not.
-		bool departed = false;
-		
-		//Check of the tracker are inside the departure zones.
+		//Make sure that the tracker are inside the departure zones.
+		//Use tracking duration (t) as (-1) when the tracker (n) is departed.
+		//Use dot product to check if tracker is going N,E,W,S directions in the corners:
 		//http://programmedlessons.org/VectorLessons/vch07/vch07_7.html
 		if (0) {}
-		else if (CM_N.contains (p [n])) {way.n ++; departed = true;}
-		else if (CM_S.contains (p [n])) {way.s ++; departed = true;}
-		else if (CM_W.contains (p [n])) {way.w ++; departed = true;}
-		else if (CM_E.contains (p [n])) {way.e ++; departed = true;}
+		else if (CM_N.contains (p [n]))
+		{
+			way.n ++;
+			t [n] = -1;
+			way.counted ++;
+		}
+		else if (CM_S.contains (p [n])) 
+		{
+			way.s ++;
+			t [n] = -1;
+			way.counted ++;
+		}
+		else if (CM_W.contains (p [n])) 
+		{
+			way.w ++;
+			t [n] = -1;
+			way.counted ++;
+		}
+		else if (CM_E.contains (p [n])) 
+		{
+			way.e ++;
+			t [n] = -1;
+			way.counted ++;
+		}
 		else if (CM_NE.contains (p [n])) 
 		{
 			bool north = dot (v [n], CM_VN) > dot (v [n], CM_VE);
 			if (north) {way.n ++;}
 			else {way.e ++;}
-			departed = true;
+			t [n] = -1;
+			way.counted ++;
 		}
 		else if (CM_SE.contains (p [n])) 
 		{
 			bool south = dot (v [n], CM_VS) > dot (v [n], CM_VE);
 			if (south) {way.s ++;}
 			else {way.e ++;}
-			departed = true;
+			t [n] = -1;
+			way.counted ++;
 		}
 		else if (CM_NW.contains (p [n])) 
 		{
 			bool north = dot (v [n], CM_VN) > dot (v [n], CM_VW);
 			if (north) {way.n ++;}
 			else {way.w ++;}
-			departed = true;
+			t [n] = -1;
+			way.counted ++;
 		}
 		else if (CM_SW.contains (p [n])) 
 		{
 			bool south = dot (v [n], CM_VS) > dot (v [n], CM_VW);
 			if (south) {way.s ++;}
 			else {way.w ++;}
-			departed = true;
-		}
-		
-		if (departed)
-		{
-			//Use tracking duration (t) as (-1) when the tracker (n) is departed.
 			t [n] = -1;
-			departed_count ++;
+			way.counted ++;
 		}
 	}
-	return departed_count;
 }
 
 
